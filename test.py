@@ -19,7 +19,7 @@ def get_word_similarity(word1, word2, model):
     return cosine_similarity(vector1, vector2)
 
 # FastText 모델 경로 (미리 다운로드한 모델 경로를 설정하세요)
-model_path = "/root/ai/flask/cc.ko.300.bin"  # 예: 영어 미리 학습된 모델
+model_path = "C:\\Users\\gjw19\\PycharmProjects\\flask\\cc.ko.300.bin"  # 예: 영어 미리 학습된 모델
 model = load_fasttext_model(model_path)
 
 # 두 단어를 입력받고 유사도 계산d
