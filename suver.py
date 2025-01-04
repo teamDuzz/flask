@@ -4,7 +4,7 @@ from typing import List
 import json
 import fasttext
 import numpy as np
-
+import heapq
 
 # 데이터 클래스 정의
 @dataclass
@@ -106,13 +106,6 @@ def adjust_score(score) ->int:
         return score
     return score
 # 멘토-멘티 매칭 함수
-def calculateFreeTimeScore(mentor: Mentor, mentee: Mentee) -> int:
-    score = 0
-    for day in range(7):
-        for hour in range(0, 48):
-            if mentor.schedule[day][hour] == 1 and mentee.schedule[day][hour] == 1:
-                score += 1
-    return score
 
 def calculateInterestScore(mentor: Mentor, mentee: Mentee) -> int:
     score = caltime(mentor, mentee) + 2*calinterest(mentor, mentee) #최대 0~5점
@@ -173,37 +166,40 @@ def receive_data():
         menteenum = len(mentorship_data.mentees)
         score_array = [[0] * menteenum for _ in range(mentornum)]
         
-        # 점수 계산
+       # 점수 계산
         for i, mentor in enumerate(mentorship_data.mentors):
             for j, mentee in enumerate(mentorship_data.mentees):
                 if mentee.option:
                     score_array[i][j] = calculateInterestScore(mentor, mentee)
                 else:
-                    score_array[i][j] = calculateFreeTimeScore(mentor, mentee)
-
+                    score_array[i][j] = calculateTimeScore(mentor, mentee)
         # 멘토당 최대 n명의 멘티 배정
         n = 5
         assigned_mentees = {mentor: [] for mentor in mentorship_data.mentors}
         mentee_assigned = [False] * menteenum
 
-        for _ in range(menteenum):
-            max_score = -1
-            best_mentor_idx = -1
-            best_mentee_idx = -1
+        # 우선순위 큐를 사용하여 점수가 높은 멘티부터 매칭
+        mentee_scores = []
+        for i, mentor in enumerate(mentorship_data.mentors):
+            for j, mentee in enumerate(mentorship_data.mentees):
+                if not mentee_assigned[j]:
+                    # 점수를 음수로 넣어 최대 힙처럼 사용
+                    heapq.heappush(mentee_scores, (-score_array[i][j], i, j))  # (음수 점수, 멘토 인덱스, 멘티 인덱스)
 
-            for i, mentor in enumerate(mentorship_data.mentors):
-                if len(assigned_mentees[mentor]) < n:
-                    for j, mentee in enumerate(mentorship_data.mentees):
-                        if not mentee_assigned[j] and score_array[i][j] > max_score:
-                            max_score = score_array[i][j]
-                            best_mentor_idx = i
-                            best_mentee_idx = j
+        # 점수가 높은 순서대로 매칭
+        while mentee_scores:
+            score, mentor_idx, mentee_idx = heapq.heappop(mentee_scores)  # 점수가 높은 멘티가 먼저 나옴
+            score = -score  # 원래 점수로 복원
+            
+            mentor = mentorship_data.mentors[mentor_idx]
+            mentee = mentorship_data.mentees[mentee_idx]
+            
+            # 해당 멘토의 배정된 멘티 수가 n명 미만이고, 멘티가 아직 배정되지 않았을 때
+            if len(assigned_mentees[mentor]) < n and not mentee_assigned[mentee_idx]:
+                assigned_mentees[mentor].append(mentee)
+                mentee_assigned[mentee_idx] = True
 
-            if best_mentor_idx != -1 and best_mentee_idx != -1:
-                assigned_mentees[mentorship_data.mentors[best_mentor_idx]].append(
-                    mentorship_data.mentees[best_mentee_idx]
-                )
-                mentee_assigned[best_mentee_idx] = True
+        # 배정된 멘티 출력
         for mentor, mentees in assigned_mentees.items():
             print(f"{mentor.name} -> {[mentee.name for mentee in mentees]}")
         # JSON 응답 생성
