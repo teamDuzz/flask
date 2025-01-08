@@ -5,6 +5,7 @@ import json
 import fasttext
 import numpy as np
 import heapq
+import tqdm
 
 # 데이터 클래스 정의
 @dataclass
@@ -107,12 +108,8 @@ def adjust_score(score) ->int:
         return score*0.3
     elif score <0.4:
         return score*0.6
-    elif score <0.6:
-        return  score*0.8
-    elif score <0.8:
-        return score*0.9
-    else:
-        return score
+    elif score <0.7:
+        return  1
     return score
 # 멘토-멘티 매칭 함수
 
@@ -176,12 +173,17 @@ def receive_data():
         menteenum = len(mentorship_data.mentees)
         score_array = [[0] * menteenum for _ in range(mentornum)]
        # 점수 계산
+        cnt=0;
         for i, mentor in enumerate(mentorship_data.mentors):
             for j, mentee in enumerate(mentorship_data.mentees):
                 if mentee.option:
                     score_array[i][j] = calculateInterestScore(mentor, mentee)
                 else:
                     score_array[i][j] = calculateTimeScore(mentor, mentee)
+                print(cnt,end=' ')
+                cnt+=1
+                print("/",end=' ')
+                print(mentornum*menteenum)
         # 멘토당 최대 n명의 멘티 배정
         print("Score calculated")
         n = 5
@@ -197,6 +199,8 @@ def receive_data():
                     heapq.heappush(mentee_scores, (-score_array[i][j], i, j))  # (음수 점수, 멘토 인덱스, 멘티 인덱스)
 
         # 점수가 높은 순서대로 매칭
+        remaining_mentees = menteenum
+        total_score = 0
         while mentee_scores:
             score, mentor_idx, mentee_idx = heapq.heappop(mentee_scores)  # 점수가 높은 멘티가 먼저 나옴
             score = -score  # 원래 점수로 복원
@@ -206,10 +210,17 @@ def receive_data():
             
             # 해당 멘토의 배정된 멘티 수가 n명 미만이고, 멘티가 아직 배정되지 않았을 때
             if len(assigned_mentees[mentor]) < n and not mentee_assigned[mentee_idx]:
+                print(f"Assign {mentee.name} to {mentor.name} with score {score}")                
                 assigned_mentees[mentor].append(mentee)
                 mentee_assigned[mentee_idx] = True
+                total_score += score
+                print(remaining_mentees,end=' ')
+                remaining_mentees -= 1
+                print("/",end=' ')
+                print(menteenum)
 
         # 배정된 멘티 출력
+        print(total_score)
         for mentor, mentees in assigned_mentees.items():
             print(f"{mentor.name} -> {[mentee.name for mentee in mentees]}")
         # JSON 응답 생성
@@ -239,7 +250,6 @@ def receive_data():
                 for mentor, mentees in assigned_mentees.items()
             ],
         }
-        print("Data processed")
         return jsonify(response), 200
 
     except Exception as e:
